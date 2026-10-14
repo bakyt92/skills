@@ -21,7 +21,8 @@ npm run pr -- prepare --evidence evidence.json [--request "..."]
     [--policy trusted-policy.txt|.json]
     Build the immutable Finance PR. Prints the report + fingerprint + approval line.
     Persists to DIR (default .finance-pr).
-    --policy loads an EXPLICITLY TRUSTED operator policy file (never invoice text).
+    --policy loads an operator-selected and confirmed policy file (never invoice text).
+      Bundled examples are inactive; omit --policy unless the operator confirms.
       Typed keys only (any other line throws; compile NL to these first, then ratify):
         currency, hard_block, role.<name>, block_supplier, block_supplier_id,
         fx.<FROM>.<TO> (operator-FROZEN rate, bound into the PR hash — never live).
@@ -31,8 +32,11 @@ npm run pr -- prepare --evidence evidence.json [--request "..."]
       Foreign currency converts ONLY via a frozen fx rate; otherwise not_applicable.
 
 npm run pr -- act --pr FPR-1 --approval "Approve Finance PR FPR-1, fingerprint XXXX-YYYY"
-    [--fresh fresh_supplier_invoice.json] [--store DIR]
-    Reload → re-hash → re-read → expiry/replay → one-shot. Terminal: ready_for_qonto.
+    --fresh fresh_supplier_invoice.json [--store DIR]
+    Supply a new Qonto read for this invocation, never cached Observe data.
+    Reload → re-hash → validate supplied state → expiry/replay → one-shot.
+    The CLI does not fetch Qonto or authenticate the fresh file's origin.
+    Terminal: ready_for_qonto.
 
 npm run pr -- show --pr FPR-1 [--store DIR]
     Print the stored PR (JSON).

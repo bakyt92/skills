@@ -161,11 +161,14 @@ gate.**
 ## Trusted company policy
 
 Finance PR can receive a separate, explicitly **trusted** policy file — operator
-configuration, **not** invoice content. Pass it to Prepare with `--policy`:
+configuration, **not** invoice content. The operator must explicitly select its
+path and confirm its contents before passing it to Prepare with `--policy`.
+Otherwise omit the flag. The bundled `trusted-policy.example.txt` is inactive;
+installation or file placement does not authorize its rules.
 
 ```bash
 npm run pr -- prepare --evidence evidence.json --request "..." --source user_chat \
-  --pr FPR-1 --policy skills/finance-pr/trusted-policy.txt
+  --pr FPR-1 --policy /path/to/operator-policy.txt
 ```
 
 The file parses only typed keys — `currency`, `hard_block`, `role.<name>`,
@@ -179,8 +182,8 @@ same way.
 
 Guarantees:
 
-- a policy embedded **inside an invoice is ignored** as authority — the file's
-  authority comes only from the operator placing it in the skill folder;
+- a policy embedded **inside an invoice is ignored** as authority — authority
+  requires the operator's explicit selection and confirmation, not file placement;
 - supplier blocks match on the **structured** Qonto `supplier_name`/`supplier_id`,
   never on document text;
 - currency mismatches are **never silently converted** — a foreign-currency

@@ -8,6 +8,8 @@ import { parseApproval } from '../src/engine/intent.js';
 import { DisabledWriteAdapter, type WriteAdapter } from '../src/engine/writeAdapter.js';
 import { hist, IBAN_A, IBAN_B, makeEvidence, makeInvoice, prepareRequest } from './helpers.js';
 import type { Approval, StoredPr } from '../src/engine/types.js';
+import { canonicalize } from '../src/engine/canonical.js';
+import { sha256 } from 'js-sha256';
 
 function preparedClean(prId = 'FPR-T') {
   const clock = fixedClock('2026-07-12T09:00:00.000Z', 1000);
@@ -63,6 +65,24 @@ describe('Act revalidation & safety chain', () => {
     const { store, events, res, approval, ev } = preparedClean();
     const r = await act({ store, prId: res.stored.body.pr_id, approval, freshInvoice: ev.invoice, clock: frozenClock('2026-07-12T11:00:00.000Z'), events });
     expect(r.outcome).toBe('expired');
+  });
+
+  it('rejects a rehashed body retaining the previously approved fingerprint', async () => {
+    const { store, events, res, approval, ev } = preparedClean();
+    const changed = structuredClone(res.stored);
+    changed.body.intent.literal_request = 'Changed proposal after approval';
+    changed.integrity.hash = sha256(canonicalize(changed.body));
+    store.putPr(changed);
+    const r = await act({ store, prId: res.stored.body.pr_id, approval, freshInvoice: ev.invoice, clock: frozenClock('2026-07-12T09:05:00.000Z'), events });
+    expect(r.outcome).toBe('integrity_failed');
+  });
+
+  it('blocks an invoice newly matched to a payment after Prepare', async () => {
+    const { store, events, res, approval, ev } = preparedClean();
+    const freshInvoice = { ...ev.invoice, matched_transaction_ids: ['payment-1'] };
+    const r = await act({ store, prId: res.stored.body.pr_id, approval, freshInvoice, clock: frozenClock('2026-07-12T09:05:00.000Z'), events });
+    expect(r.outcome).toBe('blocked');
+    expect(r.gates.find(g => g.id === 'not_already_paid_or_matched')?.status).toBe('fail');
   });
 
   it('changed amount after approval → stale', async () => {

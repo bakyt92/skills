@@ -1,7 +1,7 @@
-# Trusted finance policy — operator-authored, EXPLICITLY TRUSTED source.
+# Example finance policy — contributor-supplied, NOT active operator config.
 #
-# Drop your own copy of this file in the skill folder (e.g. trusted-policy.txt)
-# and point `prepare --policy` at it. This file is trusted CONFIG; it is NEVER
+# Review and adapt a copy, then explicitly select and confirm it before using
+# `prepare --policy`. Installation alone does not authorize these rules. It is NEVER
 # read from an invoice, PDF, email, or tool output. Amounts are decimal strings.
 #
 # Format: `key = value`, one per line. Blank lines and `#` comments are ignored.

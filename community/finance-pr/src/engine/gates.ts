@@ -13,7 +13,7 @@ import type {
   TrustedPolicy,
 } from './types.js';
 import { criticalFieldDiffs, criticalStateDigest } from './critical.js';
-import { canonicalize } from './canonical.js';
+import { canonicalize, fingerprintFromHash } from './canonical.js';
 import { sha256 } from 'js-sha256';
 import { fxRate, hasSupplierBlockList, supplierBlock } from './trustedPolicy.js';
 import { maskId } from './redact.js';
@@ -160,17 +160,18 @@ export function actGates(input: ActGateInput): Gate[] {
 
   // Recompute the hash of the stored body — detects any tamper with stored JSON.
   const recomputedHash = sha256(canonicalize(body));
-  const hashOk = recomputedHash === integrity.hash;
+  const expectedFingerprint = fingerprintFromHash(recomputedHash);
+  const hashOk = recomputedHash === integrity.hash && integrity.fingerprint === expectedFingerprint;
   gates.push({
     id: 'full_hash_matches',
     phase: 'act',
     status: hashOk ? 'pass' : 'fail',
-    reason: hashOk ? 'Stored PR body hashes to the recorded value.' : 'Stored PR body no longer matches its recorded hash — tampered.',
+    reason: hashOk ? 'Stored PR body matches its recorded hash and fingerprint.' : 'Stored PR body, hash, or fingerprint is inconsistent — tampered.',
     remediation: hashOk ? undefined : 'Reject and re-prepare a fresh Finance PR.',
   });
 
   const idFpMatch = Boolean(
-    approval && approval.pr_id === body.pr_id && approval.fingerprint === integrity.fingerprint,
+    approval && approval.pr_id === body.pr_id && approval.fingerprint === expectedFingerprint,
   );
   gates.push({
     id: 'finance_pr_id_and_fingerprint_match',
@@ -245,6 +246,15 @@ export function actGates(input: ActGateInput): Gate[] {
       ? 'The action to run is exactly the stored, allowlisted prepared action.'
       : 'The action/target does not match the stored prepared action.',
     remediation: actionOk ? undefined : 'Act never accepts replacement parameters; re-prepare.',
+  });
+
+  const paidOrMatched = freshInvoice.status === 'paid' || freshInvoice.matched_transaction_ids.length > 0;
+  gates.push({
+    id: 'not_already_paid_or_matched',
+    phase: 'act',
+    status: paidOrMatched ? 'fail' : 'pass',
+    reason: paidOrMatched ? 'Fresh invoice is already paid or matched to a transaction.' : 'Fresh invoice is not paid or matched.',
+    remediation: paidOrMatched ? 'Do not submit another payment proposal; reconcile the existing payment.' : undefined,
   });
 
   gates.push({

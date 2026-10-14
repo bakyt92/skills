@@ -2,8 +2,7 @@
 // Finance PR CLI — the local engine the Claude Skill invokes.
 // Observe -> Prepare -> Act. Synthetic by default. Qonto WRITES ARE DISABLED.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   EventLog,
   act,
@@ -16,12 +15,12 @@ import {
   shortSummary,
   systemClock,
   type Evidence,
-  type SupplierInvoiceEvidence,
   type TrustedPolicy,
   type UserRequest,
 } from '../engine/index.js';
 import { FileStore } from './fileStore.js';
-import { evidenceFromQonto, invoiceFromQonto } from './qontoAdapter.js';
+import { evidenceFromQonto } from './qontoAdapter.js';
+import { loadFreshInvoice } from './freshInvoice.js';
 import { buildScenarios } from '../fixtures/scenarios.js';
 
 function arg(name: string, fallback?: string): string | undefined {
@@ -50,7 +49,7 @@ Finance PR — review before money moves.  (synthetic by default; Qonto writes d
                                              --policy loads an explicitly trusted operator
                                              policy (role limits + hard block). Never from invoice text.
   finance-pr act    --pr FPR-1 --approval "Approve Finance PR FPR-1, fingerprint 7C91-A2B4"
-                     [--fresh rawInvoice.json] [--store DIR]
+                     --fresh rawInvoice.json [--store DIR]
                                              Revalidate + one-shot. Terminates at ready_for_qonto.
   finance-pr show   --pr FPR-1 [--store DIR]
 
@@ -119,10 +118,6 @@ function cmdPrepare(): void {
   store.putLifecycle(result.stored.body.pr_id, result.decision === 'blocked' ? 'blocked' : 'prepared');
   persistEvents(store, log);
 
-  // Sidecar: keep the observed invoice for a local `act` dry-run re-read.
-  mkdirSync(join(dir, 'observed'), { recursive: true });
-  writeFileSync(join(dir, 'observed', `${result.stored.body.pr_id}.json`), JSON.stringify(evidence.invoice, null, 2));
-
   console.log(renderReport(result));
   console.log(`\nStored in ${dir}. PR ${result.stored.body.pr_id} fingerprint ${result.stored.integrity.fingerprint}.`);
 }
@@ -141,16 +136,8 @@ async function cmdAct(): Promise<void> {
     ? approvalFromText(approvalText, parsed, 'cli-reviewer', stored.body.policy.reviewer_route, systemClock)
     : null;
 
-  // Fresh re-read: use --fresh if given, else the sidecar observed invoice.
-  let fresh: SupplierInvoiceEvidence;
-  const freshPath = arg('fresh');
-  if (freshPath) {
-    fresh = invoiceFromQonto(readJson(freshPath) as never);
-  } else {
-    const sidecar = join(dir, 'observed', `${prId}.json`);
-    if (!existsSync(sidecar)) throw new Error('No --fresh invoice and no observed sidecar; provide --fresh <rawInvoice.json>.');
-    fresh = JSON.parse(readFileSync(sidecar, 'utf8')) as SupplierInvoiceEvidence;
-  }
+  // A new Qonto read is mandatory. Cached Observe data cannot validate Act.
+  const fresh = loadFreshInvoice(arg('fresh'));
 
   const log = new EventLog(systemClock);
   const result = await act({ store, prId, approval, freshInvoice: fresh, clock: systemClock, events: log });
