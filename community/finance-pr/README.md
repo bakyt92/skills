@@ -167,7 +167,7 @@ Otherwise omit the flag. The bundled `trusted-policy.example.txt` is inactive;
 installation or file placement does not authorize its rules.
 
 ```bash
-npm run pr -- prepare --evidence evidence.json --request "..." --source user_chat \
+npm run pr -- prepare --evidence "$HOME/.finance-pr/inputs/evidence.json" --request "..." --source user_chat \
   --pr FPR-1 --policy /path/to/operator-policy.txt
 ```
 
@@ -356,8 +356,8 @@ npm run pr -- synth all      # run all six scenarios (A, B, C, D1, D2, D3)
 npm run pr -- synth C        # full report for one scenario
 
 # Real read-only flow against the sandbox:
-npm run pr -- map     --bundle bundle.json --out evidence.json
-npm run pr -- prepare --evidence evidence.json --request "..." --source user_chat --pr FPR-1
+npm run pr -- map     --bundle "$HOME/.finance-pr/inputs/bundle.json"
+npm run pr -- prepare --evidence "$HOME/.finance-pr/inputs/evidence.json" --request "..." --source user_chat --pr FPR-1
 npm run pr -- act     --pr FPR-1 --approval "Approve Finance PR FPR-1, fingerprint XXXX-YYYY"
 npm run pr -- show    --pr FPR-1
 

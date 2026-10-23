@@ -2,7 +2,7 @@
 // Finance PR CLI — the local engine the Claude Skill invokes.
 // Observe -> Prepare -> Act. Synthetic by default. Qonto WRITES ARE DISABLED.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import {
   EventLog,
   act,
@@ -21,6 +21,8 @@ import {
 import { FileStore } from './fileStore.js';
 import { evidenceFromQonto } from './qontoAdapter.js';
 import { loadFreshInvoice } from './freshInvoice.js';
+import { assertOutsideProject, privateStoreDir, writePrivateJson } from './privateStorage.js';
+import { join } from 'node:path';
 import { buildScenarios } from '../fixtures/scenarios.js';
 
 function arg(name: string, fallback?: string): string | undefined {
@@ -28,10 +30,13 @@ function arg(name: string, fallback?: string): string | undefined {
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback;
 }
 function readJson(path: string): unknown {
+  assertOutsideProject(path);
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 function storeDir(): string {
-  return arg('store', '.finance-pr')!;
+  const dir = arg('store', privateStoreDir())!;
+  assertOutsideProject(dir);
+  return dir;
 }
 function persistEvents(store: FileStore, log: EventLog): void {
   for (const e of log.all()) store.appendEvent(e);
@@ -41,7 +46,7 @@ const HELP = `
 Finance PR — review before money moves.  (synthetic by default; Qonto writes disabled)
 
   finance-pr synth [A|B|C|D1|D2|D3|all]      Run a synthetic scenario through the engine
-  finance-pr map    --bundle b.json [--out e.json]
+  finance-pr map    --bundle /private/path/b.json [--out /private/path/e.json]
                                              Map raw Qonto MCP JSON -> typed evidence
   finance-pr prepare --evidence e.json [--request "..."] [--source user_chat|document]
                      [--pr FPR-1] [--store DIR] [--policy trusted-policy.txt|.json]
@@ -55,6 +60,9 @@ Finance PR — review before money moves.  (synthetic by default; Qonto writes d
 
 Qonto MCP tools are read-only here. No tool moves money; Qonto native approval and
 SCA always remain the user's own, in the Qonto app.
+Raw input/output and store paths must be outside the demo project.
+Defaults: $HOME/.finance-pr (store), $HOME/.finance-pr/inputs/evidence.json (map).
+Approval must be an entire standalone command, never quoted or negated text.
 `;
 
 async function cmdSynth(): Promise<void> {
@@ -82,14 +90,9 @@ function cmdMap(): void {
   const bundlePath = arg('bundle');
   if (!bundlePath) throw new Error('map requires --bundle <path>');
   const ev = evidenceFromQonto(readJson(bundlePath) as never);
-  const out = arg('out');
-  const json = JSON.stringify(ev, null, 2);
-  if (out) {
-    writeFileSync(out, json);
-    console.log(`Wrote evidence -> ${out}  (data_mode=${ev.data_mode})`);
-  } else {
-    console.log(json);
-  }
+  const out = arg('out', join(privateStoreDir(), 'inputs', 'evidence.json'))!;
+  writePrivateJson(out, ev);
+  console.log(`Wrote private evidence -> ${out}  (data_mode=${ev.data_mode})`);
 }
 
 function cmdPrepare(): void {
@@ -137,7 +140,9 @@ async function cmdAct(): Promise<void> {
     : null;
 
   // A new Qonto read is mandatory. Cached Observe data cannot validate Act.
-  const fresh = loadFreshInvoice(arg('fresh'));
+  const freshPath = arg('fresh');
+  if (freshPath) assertOutsideProject(freshPath);
+  const fresh = loadFreshInvoice(freshPath);
 
   const log = new EventLog(systemClock);
   const result = await act({ store, prId, approval, freshInvoice: fresh, clock: systemClock, events: log });

@@ -9,6 +9,9 @@ dist/
 
 # Local CLI store (npm run pr -- prepare/act)
 .finance-pr/
+bundle.json
+evidence.json
+fresh_supplier_invoice.json
 
 # Logs and editor noise
 *.log

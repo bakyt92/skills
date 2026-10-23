@@ -11,7 +11,7 @@ import type { IntentClass, IntentResult, UserRequest } from './types.js';
 
 /** `Approve Finance PR FPR-104, fingerprint 7C91-A2B4.` (case-insensitive) */
 export const APPROVAL_RE =
-  /approve\s+finance\s+pr\s+([A-Za-z0-9-]+)\s*[,;:]?\s*fingerprint\s+([0-9A-Fa-f]{4}-[0-9A-Fa-f]{4})/i;
+  /^approve[ \t]+finance[ \t]+pr[ \t]+([A-Za-z0-9-]+)[ \t]*[,;:]?[ \t]*fingerprint[ \t]+([0-9A-Fa-f]{4}-[0-9A-Fa-f]{4})\.?$/i;
 
 export interface ParsedApproval {
   pr_id: string;
@@ -19,7 +19,7 @@ export interface ParsedApproval {
 }
 
 export function parseApproval(text: string): ParsedApproval | null {
-  const m = APPROVAL_RE.exec(text);
+  const m = APPROVAL_RE.exec(text.trim());
   if (!m) return null;
   return { pr_id: m[1], fingerprint: m[2].toUpperCase() };
 }

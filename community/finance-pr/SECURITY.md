@@ -48,6 +48,21 @@ masked; attachment/presigned URLs and tokens are never persisted. `npm run
 scan:secrets` fails the build if a known real sandbox value or credential/URL
 pattern appears in committed files.
 
+## Local data and demo server
+
+Raw evidence is sensitive even when reports mask it. Keep bundles, fresh reads and
+mapped evidence in `$HOME/.finance-pr/inputs/`, outside the served project, with
+owner-only permissions (0700 directories, 0600 files). CLI rejects project-local
+data/store paths. Vite binds loopback and denies legacy evidence filenames and
+`.finance-pr` paths; this is defense in depth, not permission to store raw data in
+the project. Move existing raw files out before running the demo.
+Public-directory serving is disabled. Private paths reject symlinks, including
+dangling links. Permission guarantees here are POSIX modes, not Windows ACLs;
+on Windows the operator must restrict access with equivalent private ACLs.
+
+Approval parsing accepts only a standalone command. Negated, quoted or embedded
+approval phrases cannot authorize Act. This does not establish reviewer identity.
+
 ## No hidden retries
 
 A single write attempt is made in the (disabled-by-default) controlled path. An
